@@ -1,0 +1,6 @@
+__pycache__/
+*.pth
+*.jpg
+*.png
+.vscode/
+idd20kII/
