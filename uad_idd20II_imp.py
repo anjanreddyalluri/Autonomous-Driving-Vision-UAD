@@ -21,10 +21,10 @@ from torchvision.models import mobilenet_v2, MobileNet_V2_Weights
 # SECTION 1: CONFIG — change only this if your path ever moves
 # =============================================================================
 
-BASE_PATH  = r"S:\C++Coding\IACV\idd20kII"
-SAVE_DIR   = r"S:\C++Coding\IACV"
-IMG_SIZE   = 512         # paper uses 1280×964; 512 is a good GPU-friendly size
-BATCH_SIZE = 5       # paper uses batch size 3
+BASE_PATH  = r"S:\basepath"
+SAVE_DIR   = r"S:\dirpath"
+IMG_SIZE   = 512         #  512 is a good GPU-friendly size
+BATCH_SIZE = 5       
 EPOCHS     = 20
 LR         = 0.01
 NUM_CLASSES = 3           # 0=non-drivable, 1=road, 2=drivable fallback
@@ -36,7 +36,6 @@ NUM_CLASSES = 3           # 0=non-drivable, 1=road, 2=drivable fallback
 
 # -----------------------------------------------------------------------------
 # 2A. ASPP MODULE  (5 branches: 1×1, dil-6, dil-12, dil-18, GAP)
-#     Exactly as described in the paper / standard DeepLabv3+
 # -----------------------------------------------------------------------------
 
 class ASPPConv(nn.Sequential):
@@ -101,15 +100,11 @@ class ASPP(nn.Module):
 # -----------------------------------------------------------------------------
 # 2B. UNIT ATTENTION MODULE (UAM)
 #     = Dual Attention Module (PAM + CAM) + Spatial Attention (SA)
-#     PAM  → paper Eq. (1-4)
-#     CAM  → paper Eq. (5-8)   ← includes the max(S)-S trick
-#     SA   → paper Eq. (9-10)
 # -----------------------------------------------------------------------------
 
 class PositionAttentionModule(nn.Module):
     """
     PAM — captures spatial (position) dependencies.
-    Paper Eq. (1-4).
     """
     def __init__(self, in_ch):
         super().__init__()
@@ -129,14 +124,14 @@ class PositionAttentionModule(nn.Module):
         k = self.key_conv(x).view(B, -1, N)
 
         # Spatial attention map P: (B, N, N)
-        attn = self.softmax(torch.bmm(q, k))            # Eq. (2)
+        attn = self.softmax(torch.bmm(q, k))            
 
         # V: (B, C, N)
         v   = self.value_conv(x).view(B, C, N)
         # Weighted output: (B, C, N) → (B, C, H, W)
         out = torch.bmm(v, attn.permute(0, 2, 1)).view(B, C, H, W)
 
-        return self.alpha * out + x                      # Eq. (4)
+        return self.alpha * out + x                      
 
 
 class ChannelAttentionModule(nn.Module):
@@ -157,19 +152,18 @@ class ChannelAttentionModule(nn.Module):
         f1 = x.view(B, C, N)
         f2 = f1.permute(0, 2, 1)
 
-        # Channel similarity matrix S: (B, C, C)    Eq. (5)
+        # Channel similarity matrix S: (B, C, C)    
         S = torch.bmm(f1, f2)
 
-        # max(S) - S   →   softmax   →   weight matrix G   Eq. (6)
+        # max(S) - S   →   softmax   →   weight matrix G  
         # max over last dim, kept for broadcasting
         S_max = S.max(dim=-1, keepdim=True).values
         G = self.softmax(S_max - S)
 
-        # Weighted channel features: (B, C, N) → (B, C, H, W)   Eq. (7)
+        # Weighted channel features: (B, C, N) → (B, C, H, W)  
         fc = torch.bmm(G, f1).view(B, C, H, W)
 
-        return self.beta * fc + x                        # Eq. (8)
-
+        return self.beta * fc + x                      
 
 class DualAttentionModule(nn.Module):
     """
@@ -207,13 +201,12 @@ class SpatialAttentionModule(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        # F3: channel-max   F4: channel-avg    Eq. (9)
+        # F3: channel-max   F4: channel-avg   
         f3, _ = torch.max(x, dim=1, keepdim=True)
         f4    = torch.mean(x, dim=1, keepdim=True)
         # F5: (B, 2, H, W) → spatial attention map
         f_sa  = self.sigmoid(self.conv(torch.cat([f3, f4], dim=1)))
-        return x * f_sa                                  # Eq. (10)
-
+        return x * f_sa                                 
 
 class UnitAttentionModule(nn.Module):
     """
@@ -271,11 +264,11 @@ class MobileNetV2Encoder(nn.Module):
 
 # -----------------------------------------------------------------------------
 # 2D. DECODER  — matches Table 1 of the paper exactly
-#     Step 1: Upsample high-level ×8  (NOT ×4 — paper Table 1 says rate=4
+#     Step 1: Upsample high-level ×8  (rate=4
 #             but the footnote clarifies the first upsample brings H/32→H/4)
 #             H/32 × 8 = H/4  which matches low-level spatial resolution
 #     Step 2: Conv 1×1 on low-level to reduce channels
-#     Step 3: Element-wise add (paper) / concat then conv (our impl keeps
+#     Step 3: Element-wise add / concat then conv (our impl keeps
 #             channel dims compatible via 1×1 on low first)
 #     Step 4: Conv 3×3 refinement
 #     Step 5: Upsample ×4 → original resolution
@@ -342,12 +335,12 @@ class UAD_Network(nn.Module):
 # SECTION 3: DATASET
 # =============================================================================
 
-# Class mapping (paper Section 3)
+# Class mapping
 # Class 0 = non-drivable  (all 38 remaining labels)
 # Class 1 = road
 # Class 2 = drivable fallback
 ROAD_LABELS     = {"road"}
-FALLBACK_LABELS = {"drivable fallback"}     # only this per paper Section 3
+FALLBACK_LABELS = {"drivable fallback"}  
 
 
 def json_to_mask(json_path, img_width, img_height):
