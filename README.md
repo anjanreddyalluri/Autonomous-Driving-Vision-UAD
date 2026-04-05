@@ -16,8 +16,7 @@ The model achieved the following results on the validation set (1,055 images):
   * Drivable Fallback IoU: 61.24%
 
 ## Visual Results
-*(Upload your `prediction_uad_idd20kII.png` image to your repo, then link it here)*
-![Segmentation Results](prediction_uad_idd20kII.png)
+*[Segmentation Results](https://github.com/user-attachments/assets/4ca24df8-fedb-472c-a661-3f1630eb7e28)
 
 ## Usage
 Run the training and evaluation pipeline:
